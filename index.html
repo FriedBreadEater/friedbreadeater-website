@@ -9,6 +9,2333 @@
 </head>
 <body>
     <h1>FriedBreadEater</h1>
+    <script>
+        //defining variables
+textAlign(CENTER, CENTER);
+
+var backgroundColor = color(150, 150, 255);
+var edgeColor = color(0, 0, 0);
+var nodeColor = color(255, 0, 0);
+var ballColor = color(255, 0, 0);
+var paddleColor = color(0, 0, 255);
+var runningPaddleColor = color(163, 0, 0);
+var roomColor = color(0, 255, 0);
+
+var addX = 0;
+var xRotate = 1;
+var yRotate = 0;
+var cubes = [];
+var persp = 1000;//perspective
+var horizon = 40;
+var level = 0;
+var speed = 1;
+var paddleSpeed = 4;
+var fruit = 0;
+var running = false;
+var numberScore = 0;
+var keyLeft = false;
+var keyRight = false;
+var keyUp = false;
+var keyDown = false;
+var keyW = false;
+var keyS = false;
+var keyA = false;
+var keyD = false;
+
+/*if (width === 600 && height === 400) {
+    level = 0;//what phase of game
+} else {
+    level = -1;
+}*/
+var fade = 0;
+
+var Button = function(config) {
+    this.x = config.x;
+    this.y = config.y;
+    this.z = config.z;
+    this.width = config.width;
+    this.height = config.height;
+    this.text = config.text;
+    this.coloring = config.coloring;
+};
+Button.prototype.isMouseOver = function() {
+    var mouse = new PVector(mouseX, mouseY);
+    var center = new PVector(width / 2, height / 2);
     
+    mouse.sub(center);
+    
+    if (mouse.x > this.x - this.width / 2 && mouse.x < this.x + this.width / 2 && mouse.y > this.y - this.height / 2 && mouse.y < this.y + this.height / 2) {
+        return true;
+    }
+};
+Button.prototype.rotateY3D = function(theta) {
+    var sinTheta = sin(theta);
+    var cosTheta = cos(theta);
+    var x = this.x;
+    var z = this.z;
+    this.x = x * cosTheta - z * sinTheta;
+    this.z = z * cosTheta + x * sinTheta;
+};
+Button.prototype.rotateX3D = function(theta) {
+    var sinTheta = sin(theta);
+    var cosTheta = cos(theta);
+    var y = this.y;
+    var z = this.z;
+    this.y = y * cosTheta - z * sinTheta;
+    this.z = z * cosTheta + y * sinTheta;
+};
+Button.prototype.update = function() {
+    this.rotateY3D(-yRotate);
+    this.rotateX3D(-xRotate);
+};
+Button.prototype.display = function() {
+    textAlign(CENTER, CENTER);
+    fill(this.coloring);
+    if (this.isMouseOver()) {
+        textSize(30 * (persp / (persp -220 - this.z)));
+        text(this.text, this.x, this.y);
+        cursor(HAND);
+    } else {
+        textSize(25 * (persp / (persp -220 - this.z)));
+        text(this.text, this.x, this.y);
+    }
+};
+
+var Option = function(config) {
+    this.width = config.width;
+    this.height = config.height;
+    this.choices = config.choices;
+    this.type = config.type;
+};
+Option.prototype.itemSelected = function() {
+    for (var i = 0; i < this.choices.length; i++) {
+        if (this.mouseOver(i)) {
+            for (var j = 0; j < this.choices.length; j++) {
+                this.choices[j][3] = false;
+            }
+            this.choices[i][3] = true;
+        }
+    }
+};
+Option.prototype.mouseOver = function(i) {
+    var mouse = new PVector(mouseX - width / 2, mouseY - height / 2);
+    if (mouse.x > this.choices[i][1] - this.width / 2 && mouse.x < this.choices[i][1] + this.width / 2 && mouse.y > this.choices[i][2] - this.height / 2 && mouse.y < this.choices[i][2] + this.height / 2) {
+        return true;
+    }
+};
+Option.prototype.display =  function() {
+    for (var i = 0; i < this.choices.length; i++) {
+        rectMode(CENTER);
+        if (this.type === 0 || this.type === 3) {
+            noStroke();
+            fill(200, 200, 200);
+            rect(this.choices[i][1], this.choices[i][2], this.width, this.height);
+            fill(0, 0, 0);
+            textSize(25);
+            text(this.choices[i][0], this.choices[i][1], this.choices[i][2]);
+        } else if (this.type === 1 || this.type === 2 || this.type === 4) {
+            noStroke();
+            fill(this.choices[i][0]);
+            rect(this.choices[i][1], this.choices[i][2], this.width, this.height);
+        }
+        if (this.choices[i][3] === true) {
+            noFill();
+            stroke(255, 255, 0);
+            strokeWeight(4);
+            rect(this.choices[i][1] - 1, this.choices[i][2] - 1, this.width + 9, this.height + 9);
+            if (this.type === 0) {
+                speed = this.choices[i][4];
+            } else if (this.type === 1) {
+                ballColor = this.choices[i][0];
+            } else if (this.type === 2) {
+                paddleColor = this.choices[i][0];
+            } else if (this.type === 3) {
+                paddleSpeed = this.choices[i][4];
+            } else if (this.type === 4) {
+                roomColor = this.choices[i][0];
+            }
+        }
+        rectMode(CORNER);
+        if (this.mouseOver(i)) {
+            cursor(HAND);
+        }
+    }
+};
+
+var Cube = function(x, y, z, w, h, d, color, open) {
+    //coordinates
+    this.x = x;
+    this.y = y;
+    this.z = z;
+    //width height and depth
+    this.w = w;
+    this.h = h;
+    this.d = d;
+    //the corners
+    this.node0 = [this.x, this.y, this.z, false];
+    this.node1 = [this.x + this.w, this.y,  this.z, false];
+    this.node2 = [this.x,  this.y + this.h, this.z, false];
+    this.node3 = [this.x,  this.y,  this.z + this.d, false];
+    this.node4 = [ this.x + this.w, this.y + this.h, this.z, false];
+    this.node5 = [ this.x + this.w, this.y,  this.z + this.d, false];
+    this.node6 = [ this.x,  this.y + this.h, this.z + this.d, false];
+    this.node7 = [ this.x + this.w,  this.y + this.h,  this.z + this.d, false];
+
+    this.nodes = [this.node0, this.node1, this.node2, this.node3, this.node4, this.node5, this.node6, this.node7]; 
+
+    //the edges
+    this.edge0  = [0, 1];
+    this.edge1  = [1, 4];
+    this.edge2  = [1, 5];
+    this.edge3  = [0, 2];
+    this.edge4  = [2, 4];
+    this.edge5  = [2, 6];
+    this.edge6  = [0, 3];
+    this.edge7  = [3, 5];
+    this.edge8  = [3, 6];
+    this.edge9  = [7, 4];
+    this.edge10 = [7, 6];
+    this.edge11 = [7, 5];
+    
+    this.edges = [this.edge0, this.edge1, this.edge2, this.edge3, this.edge4, this.edge5, this.edge6, this.edge7, this.edge8, this.edge9, this.edge10, this.edge11];
+    //the faces
+    this.face0 = [0, 1, 4, 2];
+    this.face1 = [0, 1, 5, 3];
+    this.face2 = [0, 2, 6, 3];
+    this.face3 = [1, 4, 7, 5];
+    this.face4 = [2, 4, 7, 6];
+    if (open === false) {
+        this.face5 = [3, 5, 7, 6];
+    }
+
+    
+    this.faces = [this.face0, this.face1, this.face2, this.face3, this.face4];
+    
+    if (open === false) {
+        this.faces.push(this.face5);
+    }
+    
+    //show if in front
+    this.valid = true;
+    //color
+    this.color = color;
+    //show front side or back side (paddle and ball are front side)
+    this.open = open;
+    this.nodeZs = [];
+};
+Cube.prototype.display = function() {
+    //orders the z positions of the nodes to find out what faces and edges to show
+    if (this.open === false) {
+    this.nodeZs = [];
+for (var i = 0; i < this.nodes.length; i++) {
+    this.nodeZs.push(this.nodes[i][2]);
+}
+    if (this.open === false) {
+        this.nodeZs.sort(function(a, b) {
+            return a-b;
+        });
+    } else {
+        this.nodeZs.sort(function(a, b) {
+            return b-a;
+        });
+    }
+    //if node is in back of shape, don't show it
+        for (var i = 0; i < this.nodes.length; i++) {
+            if (this.nodes[i][2] === this.nodeZs[0]) {
+                this.nodes[i][3] = true;
+            } else {
+                this.nodes[i][3] = false;
+            }
+        }
+    }
+    //adds perspective
+    for (var i = 0; i < this.nodes.length; i++) {
+        var p1 = persp / (persp -220 - this.nodes[i][2]);
+        if (p1 > 0) {
+            var x = this.nodes[i][0];
+            var y = this.nodes[i][1];
+            this.nodes[i][0] = p1 * x;
+            this.nodes[i][1] = p1 * y - horizon;
+        } else {
+            this.valid = false;
+        }
+    }
+    
+    this.nodes = [this.node0, this.node1, this.node2, this.node3, this.node4, this.node5, this.node6, this.node7];
+    //draws shape
+    if (this.valid === true) {
+        //draws faces
+        fill(this.color);
+        for (var f = 0; f < this.faces.length; f++) {
+            var n0 = this.faces[f][0];
+            var n1 = this.faces[f][1];
+            var n2 = this.faces[f][2];
+            var n3 = this.faces[f][3];
+            var node0 = this.nodes[n0];
+            var node1 = this.nodes[n1];
+            var node2 = this.nodes[n2];
+            var node3 = this.nodes[n3];
+            
+                noStroke();
+                quad(node0[0], node0[1], node1[0], node1[1], node2[0], node2[1], node3[0], node3[1]);
+        }
+        //draws edges
+        stroke(edgeColor);
+        for (var e=0; e<this.edges.length; e++) {
+            var n0 = this.edges[e][0];
+            var n1 = this.edges[e][1];
+            var node0 = this.nodes[n0];
+            var node1 = this.nodes[n1];
+            if (node0[3] === false && node1[3] === false) {
+                strokeWeight(1);
+                line(node0[0], node0[1], node1[0], node1[1]);
+            }
+        }
+    }
+};
+Cube.prototype.rotateZ3D = function(theta) {
+    var sinTheta = sin(theta);
+    var cosTheta = cos(theta);
+    for (var n = 0; n < this.nodes.length; n++) {
+        var node = this.nodes[n];
+        var x = node[0];
+        var y = node[1];
+        node[0] = x * cosTheta - y * sinTheta;
+        node[1] = y * cosTheta + x * sinTheta;
+    }
+};//rotates around z axis
+Cube.prototype.rotateY3D = function(theta) {
+    var sinTheta = sin(theta);
+    var cosTheta = cos(theta);
+    for (var n = 0; n < this.nodes.length; n++) {
+        var node = this.nodes[n];
+        var x = node[0];
+        var z = node[2];
+        node[0] = x * cosTheta - z * sinTheta;
+        node[2] = z * cosTheta + x * sinTheta;
+    }
+};//rotates around y axis
+Cube.prototype.rotateX3D = function(theta) {
+    var sinTheta = sin(theta);
+    var cosTheta = cos(theta);
+    
+    for (var n=0; n < this.nodes.length; n++) {
+        var node = this.nodes[n];
+        var y = node[1];
+        var z = node[2];
+        node[1] = y * cosTheta - z * sinTheta;
+        node[2] = z * cosTheta + y * sinTheta;
+    }
+};//rotates around x axis
+
+var Timer = function(config, number, timerColor) {
+    this.nodes = config;
+    this.faces = [];
+    for (var i = 1; i < config.length - 1; i++) {
+        var face = [0];
+        if (i - 1 <= number) {
+            if (config[i].length === 3) {
+                if (i < config.length - 1) {
+                    face.push(i, i + 1);
+                } else {
+                    face.push(i, 1);
+                }
+            }
+            this.faces.push(face);
+        }
+    }
+    this.valid = true;
+    this.color = timerColor; 
+};
+Timer.prototype.display = function() {
+    //adds perspective
+    for (var i = 0; i < this.nodes.length; i++) {
+        var p1 = persp / (persp -220 - this.nodes[i][2]);
+        if (p1 > 0) {
+            var x = this.nodes[i][0];
+            var y = this.nodes[i][1];
+            this.nodes[i][0] = p1 * x;
+            this.nodes[i][1] = p1 * y - horizon;
+        } else {
+            //this.valid = false;
+        }
+    }
+    
+
+    //draws shape
+    if (this.valid === true) {
+        //draws faces
+        fill(this.color);
+        for (var f = 0; f < this.faces.length; f++) {
+            var n0 = this.faces[f][0];
+            var n1 = this.faces[f][1];
+            var n2 = this.faces[f][2];
+            var node0 = this.nodes[n0];
+            var node1 = this.nodes[n1];
+            var node2 = this.nodes[n2];
+        
+            noStroke();
+            triangle(node0[0], node0[1], node1[0], node1[1], node2[0], node2[1]);
+        }
+    }
+};
+Timer.prototype.rotateZ3D = function(theta) {
+    var sinTheta = sin(theta);
+    var cosTheta = cos(theta);
+    for (var n = 0; n < this.nodes.length; n++) {
+        var node = this.nodes[n];
+        var x = node[0];
+        var y = node[1];
+        node[0] = x * cosTheta - y * sinTheta;
+        node[1] = y * cosTheta + x * sinTheta;
+    }
+};//rotates around z axis
+Timer.prototype.rotateY3D = function(theta) {
+    var sinTheta = sin(theta);
+    var cosTheta = cos(theta);
+    for (var n = 0; n < this.nodes.length; n++) {
+        var node = this.nodes[n];
+        var x = node[0];
+        var z = node[2];
+        node[0] = x * cosTheta - z * sinTheta;
+        node[2] = z * cosTheta + x * sinTheta;
+    }
+};//rotates around y axis
+Timer.prototype.rotateX3D = function(theta) {
+    var sinTheta = sin(theta);
+    var cosTheta = cos(theta);
+    
+    for (var n=0; n < this.nodes.length; n++) {
+        var node = this.nodes[n];
+        var y = node[1];
+        var z = node[2];
+        node[1] = y * cosTheta - z * sinTheta;
+        node[2] = z * cosTheta + y * sinTheta;
+    }
+};//rotates around x axis
+
+var Shadow = function(x, y, z, shadowWidth, depth, ballY) {
+    this.node0 = [x, y, z];
+    this.node1 = [x + shadowWidth, y, z];
+    this.node2 = [x, y, z + depth];
+    this.node3 = [x + shadowWidth, y, z + depth];
+    
+    this.nodes = [this.node0, this.node1, this.node2, this.node3];
+    this.y = ballY;
+};
+Shadow.prototype.rotateZ3D = function(theta) {
+    var sinTheta = sin(theta);
+    var cosTheta = cos(theta);
+    for (var n = 0; n < this.nodes.length; n++) {
+        var node = this.nodes[n];
+        var x = node[0];
+        var y = node[1];
+        node[0] = x * cosTheta - y * sinTheta;
+        node[1] = y * cosTheta + x * sinTheta;
+    }
+};//rotates around z axis
+Shadow.prototype.rotateY3D = function(theta) {
+    var sinTheta = sin(theta);
+    var cosTheta = cos(theta);
+    for (var n = 0; n < this.nodes.length; n++) {
+        var node = this.nodes[n];
+        var x = node[0];
+        var z = node[2];
+        node[0] = x * cosTheta - z * sinTheta;
+        node[2] = z * cosTheta + x * sinTheta;
+    }
+};//rotates around y axis
+Shadow.prototype.rotateX3D = function(theta) {
+    var sinTheta = sin(theta);
+    var cosTheta = cos(theta);
+    
+    for (var n=0; n < this.nodes.length; n++) {
+        var node = this.nodes[n];
+        var y = node[1];
+        var z = node[2];
+        node[1] = y * cosTheta - z * sinTheta;
+        node[2] = z * cosTheta + y * sinTheta;
+    }
+};//rotates around x axis
+Shadow.prototype.display = function() {
+    for (var i = 0; i < this.nodes.length; i++) {
+        var p1 = persp / (persp -220 - this.nodes[i][2]);
+        if (p1 > 0) {
+            var x = this.nodes[i][0];
+            var y = this.nodes[i][1];
+            this.nodes[i][0] = p1 * x;
+            this.nodes[i][1] = p1 * y - horizon;
+        } else {
+            this.valid = false;
+        }
+    }
+    this.y += 151;
+    if (this.y > 200) {
+        this.y = 200;
+    } else if (this.y < 50) {
+        this.y = 50;
+    }
+    noFill();
+    strokeWeight(2);
+    stroke(0, 0, 0, this.y / 2);
+    quad(this.node0[0], this.node0[1], this.node1[0], this.node1[1], this.node3[0], this.node3[1], this.node2[0], this.node2[1]);
+    noStroke();
+    fill(0, 0, 0, this.y);
+    quad(this.node0[0], this.node0[1], this.node1[0], this.node1[1], this.node3[0], this.node3[1], this.node2[0], this.node2[1]);
+};
+
+//ball function
+var Ball = function(z, w, h, d, move) {
+    this.position = new PVector(-10, 0, z);
+    this.z = z;
+    this.velocity = new PVector(random(-100, 100), random(-100, -30), random(-100, 100));
+    this.zVelocity = random(-1, 1);
+    this.startZVelocity = this.zVelocity;
+    this.velocity.normalize();
+    this.velocity.mult(speed);
+    this.w = w;
+    this.h = h;
+    this.d = d;
+    this.cube = new Cube(this.position.x, this.position.y, this.position.z, this.w, this.h, this.d, ballColor, false);
+    this.shadow = new Shadow(this.position.x, this.position.y, this.position.z, this.w, this.d);
+    this.move = move;
+    this.hit = false;
+};
+Ball.prototype.display = function() {
+    //draws ball
+    this.cube.display();
+    fill(0, 0, 0, 100);
+};
+Ball.prototype.update = function(shadowY, paddle) {//rotates and moves ball
+
+    if (running === true) {
+        if (paddle.position.x + 50 > this.position.x) {
+            this.velocity.x += 0.3;
+        } else if (paddle.position.x + 50 < this.position.x) {
+            this.velocity.x -= 0.3;
+        }
+        if (paddle.position.z + 50 > this.position.z) {
+            this.velocity.z += 0.3;
+        } else if (paddle.position.z + 50 < this.position.z) {
+            this.velocity.z -= 0.3;
+        }
+        if (this.velocity.y > 0) {
+            this.velocity.y += 0.25;
+        } else if (this.velocity.y <= 0) {
+            this.velocity.y -= 0.25;
+        }
+    }
+
+    this.velocity.normalize();
+    this.velocity.mult(speed);
+    this.zVelocity = this.startZVelocity + speed - 1;
+    this.cube = new Cube(this.position.x, this.position.y, this.position.z, this.w, this.h, this.d, ballColor, false);
+    this.shadow = new Shadow(this.position.x, shadowY, this.position.z, this.w, this.d, this.position.y);
+    this.cube.rotateY3D(-yRotate);
+    this.cube.rotateX3D(-xRotate);
+    this.shadow.rotateY3D(-yRotate);
+    this.shadow.rotateX3D(-xRotate);
+    if (this.move === true) {
+        this.position.add(this.velocity);
+        this.z += this.zVelocity;
+    }
+};
+Ball.prototype.checkEdges = function(paddle) {
+    if (this.position.x > 180 || this.position.x < -200){
+        this.velocity.x *= -1;
+    }
+    if (this.position.x > paddle.position.x - 15 && this.position.x < paddle.position.x + 95 && this.position.z > paddle.position.z - 15 && this.position.z < paddle.position.z + 95 && !this.hit) {
+        if (this.position.y > 120) {
+            if (running === false) {
+                this.velocity.y *= -1;
+                speed += 0.3;
+                numberScore += 1;
+                this.position.y = 120;
+                this.hit = true;
+            } else {
+                level = 3;
+            }
+        }
+        
+    } else if (this.position.y > 130) {
+        if (running === false) {
+            level = 3;
+        } else {
+            this.velocity.y *= -1;
+            speed += 0.3;
+            numberScore += 2;
+        }
+    }
+    if (this.position.y < -150) {
+        this.hit = false;
+        this.velocity.y *= -1;
+    }
+    if (this.position.z > -20 || this.position.z < -400){
+        this.velocity.z *= -1;
+    }
+};//makes ball bounce
+
+var Fruits = function() {
+    this.x = random(-150, 150);
+    this.z = random(-350, -50);
+    this.y = -150;
+    
+    this.type = floor(random(2));
+    this.show = false;
+    this.countDown = 0;
+    this.counting = false;
+    this.runningTimer = 0;
+    this.timerNumber = 3;
+    
+    if (this.type === 0) {
+        this.pos0 = [this.z, this.x, this.y + 20, 15, 15, 15, color(255, 0, 0)];
+        this.pos1 = [this.z, this.x + 20, this.y + 20, 15, 15, 15, color(255, 0, 0)];
+        this.pos2 = [this.z + 3, this.x + 5, this.y + 15, 25, 5, 9, color(0, 255, 0)];
+        this.pos3 = [this.z + 3, this.x + 15, this.y, 5, 15, 9, color(0, 255, 0)];
+        this.allPos = [this.pos0, this.pos1, this.pos2, this.pos3];
+        
+        this.shadow0 = new Shadow(this.x, 140, this.z, 35, 15, this.y);
+        this.fruitShadows = [this.shadow0];
+    } else if (this.type === 1) {
+        this.pos0 = [this.z, this.x, this.y + 20, 15, 15, 15, color(100, 100, 100)];
+        this.allPos = [this.pos0];
+        this.shadow0 = new Shadow(this.x, 140, this.z, 15, 15, this.y);
+        this.fruitShadows = [this.shadow0];
+    }
+    this.cubes = [];
+    for (var i = 0; i < this.allPos.length; i++) {
+        var pos = this.allPos[i];
+        this.cubes.push(new Cube(pos[1], pos[2], pos[0], pos[3], pos[4], pos[5], pos[6], false));
+    }
+    this.timerWall = floor(random(2));
+    if (this.timerWall === 0) {
+        this.timerWall = -200;
+    } else if (this.timerWall === 1) {
+        this.timerWall = 200;
+    }
+    this.timerRadius = -50;
+    this.timerCoordinate = new PVector(0, this.timerRadius);
+    this.timerCoordinates = [[this.timerWall, 0, -200]];
+    
+    for (var i = 0; i < 3; i ++) {
+        this.timerCoordinates.push([this.timerWall, this.timerCoordinate.y, -200 + this.timerCoordinate.x]);
+        this.timerCoordinate.rotate(-20);
+    }
+    
+    this.timer = new Timer(this.timerCoordinates, this.timerNumber, runningPaddleColor);
+};
+Fruits.prototype.display = function() {
+    this.timerRadius = -50;
+    this.timerCoordinate = new PVector(0, this.timerRadius);
+    this.timerCoordinates = [[this.timerWall, 0, -200]];
+    
+    for (var i = 0; i < 20; i ++) {
+        this.timerCoordinates.push([this.timerWall, this.timerCoordinate.y, -200 + this.timerCoordinate.x]);
+        this.timerCoordinate.rotate(-20);
+    }
+    this.timer = new Timer(this.timerCoordinates, this.timerNumber, runningPaddleColor);
+    if (this.show === true) {
+        this.allCubes = [];
+        
+        for (var i = 0; i < this.allPos.length; i++) {
+            var pos = this.allPos[i];
+            this.allCubes.push(new Cube(pos[1], pos[2], pos[0], pos[3], pos[4], pos[5], pos[6], false));
+        }
+        
+        for (var i = 0; i < this.allCubes.length; i++) {
+            this.allCubes[i].rotateY3D(-yRotate);
+            this.allCubes[i].rotateX3D(-xRotate);
+        }
+        for (var i = 0; i < this.fruitShadows.length; i++) {
+            this.fruitShadows[i].rotateY3D(-yRotate);
+            this.fruitShadows[i].rotateX3D(-xRotate);
+        }
+        this.cubes = [];
+        for (var i = 0; i < this.allPos.length; i++) {
+            var pos = this.allPos[i];
+            var cube = this.allCubes[i];
+            
+            var meanZ = cube.nodes[0][2] + cube.nodes[7][2] - 0.2 * (abs(cube.nodes[0][1]) + abs(cube.nodes[7][1]));
+            
+            this.cubes.push([meanZ, pos, cube, i]);
+        }
+        
+        this.cubes.sort(function(a, b) {
+            return a[0]-b[0];
+        });
+        for (var i = 0; i < this.fruitShadows.length; i++) {
+            this.fruitShadows[i].display();
+        }
+        for (var i = 0; i < this.cubes.length; i++) {
+            this.cubes[i][2].display();
+        }
+    }
+    
+    if (running === true) {
+        this.timer.rotateY3D(-yRotate);
+        this.timer.rotateX3D(-xRotate);
+        this.timer.display();
+    }
+    
+};
+Fruits.prototype.update = function() {
+    if (this.show === false && this.counting === false) {
+        this.countDown = millis();
+        this.counting = true;
+    }
+    if (this.counting === true && millis() - this.countDown > 10000) {
+        this.show = true;
+        this.counting = false;
+    }
+    if (this.show === true) {
+        this.y += 1;
+        if (this.type === 0) {
+            this.pos0 = [this.z, this.x, this.y + 20, 15, 15, 15, color(255, 0, 0)];
+            this.pos1 = [this.z, this.x + 20, this.y + 20, 15, 15, 15, color(255, 0, 0)];
+            this.pos2 = [this.z + 3, this.x + 5, this.y + 15, 25, 5, 9, color(0, 255, 0)];
+            this.pos3 = [this.z + 3, this.x + 15, this.y, 5, 15, 9, color(0, 255, 0)];
+            this.allPos = [this.pos0, this.pos1, this.pos2, this.pos3];
+            
+            this.shadow0 = new Shadow(this.x, 150, this.z, 35, 15, this.y);
+            this.fruitShadows = [this.shadow0];
+            
+        }  else if (this.type === 1) {
+            this.pos0 = [this.z, this.x, this.y + 20, 15, 15, 15, color(map(noise(frameCount / 100), 0, 1, 0, 255), map(noise((frameCount + 100) / 100), 0, 1, 0, 255), map(noise((frameCount + 100) / 100), 0, 1, 0, 255))];
+            this.allPos = [this.pos0];
+            this.shadow0 = new Shadow(this.x, 140, this.z, 15, 15, this.y);
+            this.fruitShadows = [this.shadow0];
+        }
+    }
+    if (this.timerNumber < 0) {
+        running = false;
+    } else if (millis() - this.runningTimer > 500) {
+        this.runningTimer = millis();
+        this.timerNumber -= 1;
+    }
+};
+Fruits.prototype.checkEdges = function(paddle) {
+    if (this.x > paddle.position.x - 15 && this.x < paddle.position.x + 95 && this.z > paddle.position.z - 15 && this.z < paddle.position.z + 95 && this.y > 110){
+        if (this.type === 0) {
+            numberScore += 2;
+        } else if (this.type === 1) {
+            running = true;
+            this.timerNumber = 17;
+            this.timerWall = floor(random(2));
+            if (this.timerWall === 0) {
+                this.timerWall = -200;
+            } else if (this.timerWall === 1) {
+                this.timerWall = 200;
+            }
+            this.runningTimer = millis();
+        }
+        this.show = false;
+        this.y = -150;
+        this.x = random(-150, 150);
+        this.z = random(-350, -50);
+        this.type = floor(random(2));
+    } else if (this.y > 120) {
+        this.y = -150;
+        this.show = false;
+        this.x = random(-150, 150);
+        this.z = random(-350, -50);
+    }
+};
+
+
+//room function
+var Room = function() {
+    this.position = new PVector(-200, -150, -400);
+    this.w = 400;
+    this.h = 300;
+    this.d = 410;
+    this.cube = new Cube(this.position.x, this.position.y, this.position.z, this.w, this.h, this.d, color(200, 200, 200), true);
+};
+Room.prototype.display = function() {
+    this.cube.display();
+};//draws room as inside of cube
+Room.prototype.update = function() {
+    this.cube = new Cube(this.position.x, this.position.y, this.position.z, this.w, this.h, this.d, roomColor, true);
+    this.cube.rotateY3D(-yRotate);
+    this.cube.rotateX3D(-xRotate);
+};//rotates room
+
+
+var Paddle = function(y, z) {
+    this.position = new PVector(-50, y, z);
+    this.w = 100;
+    this.h = 10;
+    this.d = 100;
+    this.cube = new Cube(this.position.x, this.position.y, this.position.z, this.w, this.h, this.d, paddleColor, false);
+};
+Paddle.prototype.display = function() {
+    this.cube.display();
+};
+Paddle.prototype.update = function() {
+    if (running === false) {
+        this.cube = new Cube(this.position.x, this.position.y, this.position.z, this.w, this.h, this.d, paddleColor, false);
+    } else if (running === true) {
+        this.cube = new Cube(this.position.x, this.position.y, this.position.z, this.w, this.h, this.d, runningPaddleColor, false);
+    }
+    this.cube.rotateY3D(-yRotate);
+    this.cube.rotateX3D(-xRotate);
+};
+Paddle.prototype.arrows = function() {
+    if (keyUp && this.position.z > -400) {
+        this.position.z -= paddleSpeed;
+    }
+    if (keyDown && this.position.z < -90) {
+        this.position.z += paddleSpeed;
+    }
+    if (keyRight && this.position.x < 100) {
+        this.position.x += paddleSpeed;
+    }
+    if (keyLeft && this.position.x > -200) {
+        this.position.x -= paddleSpeed;
+    }
+};
+
+var Pong = function(x, y, z) {
+    this.x = x;
+    this.y = y;
+    this.z = z;
+    this.pos0 = [ this.z, this.x, this.y, 20, 84, 20];
+    this.pos1 = [ this.z, this.x + 20, this.y, 20, 20, 20];
+    this.pos2 = [ this.z, this.x + 20, this.y + 40, 20, 20, 20];
+    this.pos3 = [ this.z, this.x + 40, this.y, 20, 60, 20];
+    this.pos4 = [ this.z, this.x + 80, this.y + 24, 60, 60, 20];
+    this.pos5 = [ this.z, this.x + 160, this.y + 24, 20, 60, 20];
+    this.pos6 = [ this.z, this.x + 200, this.y + 24, 20, 60, 20];
+    this.pos7 = [ this.z, this.x + 180, this.y + 24, 20, 20, 20];
+    this.pos8 = [ this.z, this.x + 240, this.y + 24, 20, 60, 20];
+    this.pos9 = [ this.z, this.x + 280, this.y + 24, 20, 100, 20];
+    this.pos10 = [ this.z, this.x + 260, this.y + 24, 20, 20, 20];
+    this.pos11 = [ this.z, this.x + 260, this.y + 64, 20, 20, 20];
+    this.pos12 = [ this.z, this.x + 240, this.y + 104, 40, 20, 20];
+    
+    this.allPos = [this.pos0, this.pos1, this.pos2, this.pos3, this.pos4, this.pos5, this.pos6, this.pos7, this.pos8, this.pos9, this.pos10, this.pos11, this.pos12];
+    
+    this.cubes = [];
+    for (var i = 0; i < this.allPos.length; i++) {
+        var pos = this.allPos[i];
+        this.cubes.push(new Cube(pos[1], pos[2], pos[0], pos[3], pos[4], pos[5], color(255, 255, 0), false));
+    }
+};
+Pong.prototype.update = function() {
+    
+    this.allCubes = [];
+    
+    for (var i = 0; i < this.allPos.length; i++) {
+        var pos = this.allPos[i];
+        this.allCubes.push(new Cube(pos[1], pos[2], pos[0], pos[3], pos[4], pos[5], color(255, 255, 0), false));
+    }
+    
+    for (var i = 0; i < this.allCubes.length; i++) {
+        this.allCubes[i].rotateY3D(-yRotate);
+        this.allCubes[i].rotateX3D(-xRotate);
+    }
+    this.cubes = [];
+    for (var i = 0; i < this.allPos.length; i++) {
+        var pos = this.allPos[i];
+        var cube = this.allCubes[i];
+        
+        var meanZ = cube.nodes[0][2] + cube.nodes[7][2] - 0.2 * (abs(cube.nodes[0][1]) + abs(cube.nodes[7][1]));
+        
+        this.cubes.push([meanZ, pos, cube, i]);
+    }
+    
+    this.cubes.sort(function(a, b) {
+        return a[0]-b[0];
+    });
+    for (var i = 0; i < this.cubes.length; i++) {
+        this.cubes[i][2].display();
+    }
+};
+
+
+/***************************
+ * defines numbers in threeD
+****************************/
+var Number0 = function(x, y, z) {
+    this.x = x;
+    this.y = y;
+    this.z = z;
+    this.node0 = [x, y, z];
+    this.node1 = [x + 20, y, z];
+    this.node2 = [x, y + 80, z];
+    this.node3 = [x + 20, y + 80, z];
+    this.node4 = [x + 20, y + 20, z];
+    this.node5 = [x + 40, y + 20, z];
+    this.node6 = [x + 40, y, z];
+    this.node7 = [x + 60, y, z];
+    this.node8 = [x + 40, y + 80, z];
+    this.node9 = [x + 60, y + 80, z];
+    this.node10 = [x + 20, y + 60, z];
+    this.node11 = [x + 40, y + 60, z];
+    this.nodes = [this.node0, this.node1, this.node2, this.node3, this.node4, this.node5, this.node6, this.node7, this.node8, this.node9, this.node10, this.node11];
+    
+    this.face0 = [0, 1, 3, 2];
+    this.face1 = [1, 4, 5, 6];
+    this.face2 = [6, 7, 9, 8];
+    this.face3 = [3, 8, 11, 10];
+    this.faces = [this.face0, this.face1, this.face2, this.face3];
+};
+Number0.prototype.rotateZ3D = function(theta) {
+    var sinTheta = sin(theta);
+    var cosTheta = cos(theta);
+    for (var n = 0; n < this.nodes.length; n++) {
+        var node = this.nodes[n];
+        var x = node[0];
+        var y = node[1];
+        node[0] = x * cosTheta - y * sinTheta;
+        node[1] = y * cosTheta + x * sinTheta;
+    }
+};//rotates around z axis
+Number0.prototype.rotateY3D = function(theta) {
+    var sinTheta = sin(theta);
+    var cosTheta = cos(theta);
+    for (var n = 0; n < this.nodes.length; n++) {
+        var node = this.nodes[n];
+        var x = node[0];
+        var z = node[2];
+        node[0] = x * cosTheta - z * sinTheta;
+        node[2] = z * cosTheta + x * sinTheta;
+    }
+};//rotates around y axis
+Number0.prototype.rotateX3D = function(theta) {
+    var sinTheta = sin(theta);
+    var cosTheta = cos(theta);
+    
+    for (var n=0; n < this.nodes.length; n++) {
+        var node = this.nodes[n];
+        var y = node[1];
+        var z = node[2];
+        node[1] = y * cosTheta - z * sinTheta;
+        node[2] = z * cosTheta + y * sinTheta;
+    }
+};//rotates around x axis
+Number0.prototype.display = function() {
+    for (var i = 0; i < this.nodes.length; i++) {
+        var p1 = persp / (persp -220 - this.nodes[i][2]);
+        if (p1 > 0) {
+            var x = this.nodes[i][0];
+            var y = this.nodes[i][1];
+            this.nodes[i][0] = p1 * x;
+            this.nodes[i][1] = p1 * y - horizon;
+        } else {
+            this.valid = false;
+        }
+    }
+    for (var f = 0; f < this.faces.length; f++) {
+            var n0 = this.faces[f][0];
+            var n1 = this.faces[f][1];
+            var n2 = this.faces[f][2];
+            var n3 = this.faces[f][3];
+            var node0 = this.nodes[n0];
+            var node1 = this.nodes[n1];
+            var node2 = this.nodes[n2];
+            var node3 = this.nodes[n3];
+            
+                fill(0, 0, 0);
+                quad(node0[0], node0[1], node1[0], node1[1], node2[0], node2[1], node3[0], node3[1]);
+    }
+};//number 0 draws
+
+var Number1 = function(x, y, z) {
+    this.x = x;
+    this.y = y;
+    this.z = z;
+    this.node0 = [x + 20, y, z];
+    this.node1 = [x + 40, y, z];
+    this.node2 = [x + 20, y + 80, z];
+    this.node3 = [x + 40, y + 80, z];
+    this.nodes = [this.node0, this.node1, this.node2, this.node3];
+    
+    this.face0 = [0, 1, 3, 2];
+    this.faces = [this.face0];
+};
+Number1.prototype.rotateZ3D = function(theta) {
+    var sinTheta = sin(theta);
+    var cosTheta = cos(theta);
+    for (var n = 0; n < this.nodes.length; n++) {
+        var node = this.nodes[n];
+        var x = node[0];
+        var y = node[1];
+        node[0] = x * cosTheta - y * sinTheta;
+        node[1] = y * cosTheta + x * sinTheta;
+    }
+};//rotates around z axis
+Number1.prototype.rotateY3D = function(theta) {
+    var sinTheta = sin(theta);
+    var cosTheta = cos(theta);
+    for (var n = 0; n < this.nodes.length; n++) {
+        var node = this.nodes[n];
+        var x = node[0];
+        var z = node[2];
+        node[0] = x * cosTheta - z * sinTheta;
+        node[2] = z * cosTheta + x * sinTheta;
+    }
+};//rotates around y axis
+Number1.prototype.rotateX3D = function(theta) {
+    var sinTheta = sin(theta);
+    var cosTheta = cos(theta);
+    
+    for (var n=0; n < this.nodes.length; n++) {
+        var node = this.nodes[n];
+        var y = node[1];
+        var z = node[2];
+        node[1] = y * cosTheta - z * sinTheta;
+        node[2] = z * cosTheta + y * sinTheta;
+    }
+};//rotates around x axis
+Number1.prototype.display = function() {
+    for (var i = 0; i < this.nodes.length; i++) {
+        var p1 = persp / (persp -220 - this.nodes[i][2]);
+        if (p1 > 0) {
+            var x = this.nodes[i][0];
+            var y = this.nodes[i][1];
+            this.nodes[i][0] = p1 * x;
+            this.nodes[i][1] = p1 * y - horizon;
+        } else {
+            this.valid = false;
+        }
+    }
+    for (var f = 0; f < this.faces.length; f++) {
+            var n0 = this.faces[f][0];
+            var n1 = this.faces[f][1];
+            var n2 = this.faces[f][2];
+            var n3 = this.faces[f][3];
+            var node0 = this.nodes[n0];
+            var node1 = this.nodes[n1];
+            var node2 = this.nodes[n2];
+            var node3 = this.nodes[n3];
+            
+                fill(0, 0, 0);
+                quad(node0[0], node0[1], node1[0], node1[1], node2[0], node2[1], node3[0], node3[1]);
+    }
+};//number 1 draws
+
+var Number2 = function(x, y, z) {
+    this.x = x;
+    this.y = y;
+    this.z = z;
+    this.node0 = [x, y, z];
+    this.node1 = [x + 60, y, z];
+    this.node2 = [x, y + 16, z];
+    this.node3 = [x + 60, y + 16, z];
+    this.node4 = [x + 40, y + 16, z];
+    this.node5 = [x + 40, y + 32, z];
+    this.node6 = [x + 60, y + 32, z];
+    this.node7 = [x, y + 32, z];
+    this.node8 = [x, y + 48, z];
+    this.node9 = [x + 60, y + 48, z];
+    this.node10 = [x + 16, y + 48, z];
+    this.node11 = [x, y + 64, z];
+    this.node12 = [x + 16, y + 64, z];
+    this.node13 = [x + 60, y + 64, z];
+    this.node14 = [x, y + 80, z];
+    this.node15 = [x + 60, y + 80, z];
+    this.nodes = [this.node0, this.node1, this.node2, this.node3, this.node4, this.node5, this.node6, this.node7, this.node8, this.node9, this.node10, this.node11, this.node12, this.node13, this.node14, this.node15];
+    
+    this.face0 = [0, 1, 3, 2];
+    this.face1 = [3, 4, 5, 6];
+    this.face2 = [6, 7, 8, 9];
+    this.face3 = [8, 10, 12, 11];
+    this.face4 = [11, 13, 15, 14];
+    this.faces = [this.face0, this.face1, this.face2, this.face3, this.face4];
+};
+Number2.prototype.rotateZ3D = function(theta) {
+    var sinTheta = sin(theta);
+    var cosTheta = cos(theta);
+    for (var n = 0; n < this.nodes.length; n++) {
+        var node = this.nodes[n];
+        var x = node[0];
+        var y = node[1];
+        node[0] = x * cosTheta - y * sinTheta;
+        node[1] = y * cosTheta + x * sinTheta;
+    }
+};//rotates around z axis
+Number2.prototype.rotateY3D = function(theta) {
+    var sinTheta = sin(theta);
+    var cosTheta = cos(theta);
+    for (var n = 0; n < this.nodes.length; n++) {
+        var node = this.nodes[n];
+        var x = node[0];
+        var z = node[2];
+        node[0] = x * cosTheta - z * sinTheta;
+        node[2] = z * cosTheta + x * sinTheta;
+    }
+};//rotates around y axis
+Number2.prototype.rotateX3D = function(theta) {
+    var sinTheta = sin(theta);
+    var cosTheta = cos(theta);
+    
+    for (var n=0; n < this.nodes.length; n++) {
+        var node = this.nodes[n];
+        var y = node[1];
+        var z = node[2];
+        node[1] = y * cosTheta - z * sinTheta;
+        node[2] = z * cosTheta + y * sinTheta;
+    }
+};//rotates around x axis
+Number2.prototype.display = function() {
+    for (var i = 0; i < this.nodes.length; i++) {
+        var p1 = persp / (persp -220 - this.nodes[i][2]);
+        if (p1 > 0) {
+            var x = this.nodes[i][0];
+            var y = this.nodes[i][1];
+            this.nodes[i][0] = p1 * x;
+            this.nodes[i][1] = p1 * y - horizon;
+        } else {
+            this.valid = false;
+        }
+    }
+    for (var f = 0; f < this.faces.length; f++) {
+            var n0 = this.faces[f][0];
+            var n1 = this.faces[f][1];
+            var n2 = this.faces[f][2];
+            var n3 = this.faces[f][3];
+            var node0 = this.nodes[n0];
+            var node1 = this.nodes[n1];
+            var node2 = this.nodes[n2];
+            var node3 = this.nodes[n3];
+            
+                fill(0, 0, 0);
+                quad(node0[0], node0[1], node1[0], node1[1], node2[0], node2[1], node3[0], node3[1]);
+    }
+};//number 2 draws
+
+var Number3 = function(x, y, z) {
+    this.x = x;
+    this.y = y;
+    this.z = z;
+    this.node0 = [x, y, z];
+    this.node1 = [x + 40, y, z];
+    this.node2 = [x, y + 16, z];
+    this.node3 = [x + 40, y + 16, z];
+    this.node4 = [x + 40, y + 80, z];
+    this.node5 = [x + 60, y, z];
+    this.node6 = [x + 60, y + 80, z];
+    this.node7 = [x + 20, y + 32, z];
+    this.node8 = [x + 40, y + 32, z];
+    this.node9 = [x + 20, y + 48, z];
+    this.node10 = [x + 40, y + 48, z];
+    this.node11 = [x, y + 64, z];
+    this.node12 = [x + 40, y + 64, z];
+    this.node13 = [x, y + 80, z];
+    this.nodes = [this.node0, this.node1, this.node2, this.node3, this.node4, this.node5, this.node6, this.node7, this.node8, this.node9, this.node10, this.node11, this.node12, this.node13];
+    
+    this.face0 = [0, 1, 3, 2];
+    this.face1 = [1, 4, 6, 5];
+    this.face2 = [7, 8, 10, 9];
+    this.face3 = [11, 12, 4, 13];
+    this.faces = [this.face0, this.face1, this.face2, this.face3];
+};
+Number3.prototype.rotateZ3D = function(theta) {
+    var sinTheta = sin(theta);
+    var cosTheta = cos(theta);
+    for (var n = 0; n < this.nodes.length; n++) {
+        var node = this.nodes[n];
+        var x = node[0];
+        var y = node[1];
+        node[0] = x * cosTheta - y * sinTheta;
+        node[1] = y * cosTheta + x * sinTheta;
+    }
+};//rotates around z axis
+Number3.prototype.rotateY3D = function(theta) {
+    var sinTheta = sin(theta);
+    var cosTheta = cos(theta);
+    for (var n = 0; n < this.nodes.length; n++) {
+        var node = this.nodes[n];
+        var x = node[0];
+        var z = node[2];
+        node[0] = x * cosTheta - z * sinTheta;
+        node[2] = z * cosTheta + x * sinTheta;
+    }
+};//rotates around y axis
+Number3.prototype.rotateX3D = function(theta) {
+    var sinTheta = sin(theta);
+    var cosTheta = cos(theta);
+    
+    for (var n=0; n < this.nodes.length; n++) {
+        var node = this.nodes[n];
+        var y = node[1];
+        var z = node[2];
+        node[1] = y * cosTheta - z * sinTheta;
+        node[2] = z * cosTheta + y * sinTheta;
+    }
+};//rotates around x axis
+Number3.prototype.display = function() {
+    for (var i = 0; i < this.nodes.length; i++) {
+        var p1 = persp / (persp -220 - this.nodes[i][2]);
+        if (p1 > 0) {
+            var x = this.nodes[i][0];
+            var y = this.nodes[i][1];
+            this.nodes[i][0] = p1 * x;
+            this.nodes[i][1] = p1 * y - horizon;
+        } else {
+            this.valid = false;
+        }
+    }
+    for (var f = 0; f < this.faces.length; f++) {
+            var n0 = this.faces[f][0];
+            var n1 = this.faces[f][1];
+            var n2 = this.faces[f][2];
+            var n3 = this.faces[f][3];
+            var node0 = this.nodes[n0];
+            var node1 = this.nodes[n1];
+            var node2 = this.nodes[n2];
+            var node3 = this.nodes[n3];
+            
+                fill(0, 0, 0);
+                quad(node0[0], node0[1], node1[0], node1[1], node2[0], node2[1], node3[0], node3[1]);
+    }
+};//number 3 draws
+
+var Number4 = function(x, y, z) {
+    this.x = x;
+    this.y = y;
+    this.z = z;
+    this.node0 = [x, y, z];
+    this.node1 = [x + 20, y, z];
+    this.node2 = [x, y + 48, z];
+    this.node3 = [x + 20, y + 48, z];
+    this.node4 = [x + 40, y + 80, z];
+    this.node5 = [x + 60, y, z];
+    this.node6 = [x + 60, y + 80, z];
+    this.node7 = [x + 20, y + 32, z];
+    this.node8 = [x + 40, y + 32, z];
+    this.node9 = [x + 20, y + 48, z];
+    this.node10 = [x + 40, y + 48, z];
+    this.node11 = [x + 40, y, z];
+    this.nodes = [this.node0, this.node1, this.node2, this.node3, this.node4, this.node5, this.node6, this.node7, this.node8, this.node9, this.node10, this.node11];
+    
+    this.face0 = [0, 1, 3, 2];
+    this.face1 = [11, 4, 6, 5];
+    this.face2 = [7, 8, 10, 9];
+    this.faces = [this.face0, this.face1, this.face2];
+};
+Number4.prototype.rotateZ3D = function(theta) {
+    var sinTheta = sin(theta);
+    var cosTheta = cos(theta);
+    for (var n = 0; n < this.nodes.length; n++) {
+        var node = this.nodes[n];
+        var x = node[0];
+        var y = node[1];
+        node[0] = x * cosTheta - y * sinTheta;
+        node[1] = y * cosTheta + x * sinTheta;
+    }
+};//rotates around z axis
+Number4.prototype.rotateY3D = function(theta) {
+    var sinTheta = sin(theta);
+    var cosTheta = cos(theta);
+    for (var n = 0; n < this.nodes.length; n++) {
+        var node = this.nodes[n];
+        var x = node[0];
+        var z = node[2];
+        node[0] = x * cosTheta - z * sinTheta;
+        node[2] = z * cosTheta + x * sinTheta;
+    }
+};//rotates around y axis
+Number4.prototype.rotateX3D = function(theta) {
+    var sinTheta = sin(theta);
+    var cosTheta = cos(theta);
+    
+    for (var n=0; n < this.nodes.length; n++) {
+        var node = this.nodes[n];
+        var y = node[1];
+        var z = node[2];
+        node[1] = y * cosTheta - z * sinTheta;
+        node[2] = z * cosTheta + y * sinTheta;
+    }
+};//rotates around x axis
+Number4.prototype.display = function() {
+    for (var i = 0; i < this.nodes.length; i++) {
+        var p1 = persp / (persp -220 - this.nodes[i][2]);
+        if (p1 > 0) {
+            var x = this.nodes[i][0];
+            var y = this.nodes[i][1];
+            this.nodes[i][0] = p1 * x;
+            this.nodes[i][1] = p1 * y - horizon;
+        } else {
+            this.valid = false;
+        }
+    }
+    for (var f = 0; f < this.faces.length; f++) {
+            var n0 = this.faces[f][0];
+            var n1 = this.faces[f][1];
+            var n2 = this.faces[f][2];
+            var n3 = this.faces[f][3];
+            var node0 = this.nodes[n0];
+            var node1 = this.nodes[n1];
+            var node2 = this.nodes[n2];
+            var node3 = this.nodes[n3];
+            
+                fill(0, 0, 0);
+                quad(node0[0], node0[1], node1[0], node1[1], node2[0], node2[1], node3[0], node3[1]);
+    }
+};//number 4 draws
+
+var Number5 = function(x, y, z) {
+    this.x = x;
+    this.y = y;
+    this.z = z;
+    this.node0 = [x, y, z];
+    this.node1 = [x + 60, y, z];
+    this.node2 = [x, y + 16, z];
+    this.node3 = [x + 60, y + 16, z];
+    this.node4 = [x + 20, y + 16, z];
+    this.node5 = [x + 20, y + 32, z];
+    this.node6 = [x, y + 32, z];
+    this.node7 = [x + 60, y + 32, z];
+    this.node8 = [x, y + 48, z];
+    this.node9 = [x + 60, y + 48, z];
+    this.node10 = [x + 40, y + 48, z];
+    this.node11 = [x, y + 64, z];
+    this.node12 = [x + 40, y + 64, z];
+    this.node13 = [x + 60, y + 64, z];
+    this.node14 = [x, y + 80, z];
+    this.node15 = [x + 60, y + 80, z];
+    this.nodes = [this.node0, this.node1, this.node2, this.node3, this.node4, this.node5, this.node6, this.node7, this.node8, this.node9, this.node10, this.node11, this.node12, this.node13, this.node14, this.node15];
+    
+    this.face0 = [0, 1, 3, 2];
+    this.face1 = [2, 4, 5, 6];
+    this.face2 = [6, 7, 9, 8];
+    this.face3 = [9, 10, 12, 13];
+    this.face4 = [11, 13, 15, 14];
+    this.faces = [this.face0, this.face1, this.face2, this.face3, this.face4];
+};
+Number5.prototype.rotateZ3D = function(theta) {
+    var sinTheta = sin(theta);
+    var cosTheta = cos(theta);
+    for (var n = 0; n < this.nodes.length; n++) {
+        var node = this.nodes[n];
+        var x = node[0];
+        var y = node[1];
+        node[0] = x * cosTheta - y * sinTheta;
+        node[1] = y * cosTheta + x * sinTheta;
+    }
+};//rotates around z axis
+Number5.prototype.rotateY3D = function(theta) {
+    var sinTheta = sin(theta);
+    var cosTheta = cos(theta);
+    for (var n = 0; n < this.nodes.length; n++) {
+        var node = this.nodes[n];
+        var x = node[0];
+        var z = node[2];
+        node[0] = x * cosTheta - z * sinTheta;
+        node[2] = z * cosTheta + x * sinTheta;
+    }
+};//rotates around y axis
+Number5.prototype.rotateX3D = function(theta) {
+    var sinTheta = sin(theta);
+    var cosTheta = cos(theta);
+    
+    for (var n=0; n < this.nodes.length; n++) {
+        var node = this.nodes[n];
+        var y = node[1];
+        var z = node[2];
+        node[1] = y * cosTheta - z * sinTheta;
+        node[2] = z * cosTheta + y * sinTheta;
+    }
+};//rotates around x axis
+Number5.prototype.display = function() {
+    for (var i = 0; i < this.nodes.length; i++) {
+        var p1 = persp / (persp -220 - this.nodes[i][2]);
+        if (p1 > 0) {
+            var x = this.nodes[i][0];
+            var y = this.nodes[i][1];
+            this.nodes[i][0] = p1 * x;
+            this.nodes[i][1] = p1 * y - horizon;
+        } else {
+            this.valid = false;
+        }
+    }
+    for (var f = 0; f < this.faces.length; f++) {
+            var n0 = this.faces[f][0];
+            var n1 = this.faces[f][1];
+            var n2 = this.faces[f][2];
+            var n3 = this.faces[f][3];
+            var node0 = this.nodes[n0];
+            var node1 = this.nodes[n1];
+            var node2 = this.nodes[n2];
+            var node3 = this.nodes[n3];
+            
+                fill(0, 0, 0);
+                quad(node0[0], node0[1], node1[0], node1[1], node2[0], node2[1], node3[0], node3[1]);
+    }
+};//number 5 draws
+
+var Number6 = function(x, y, z) {
+    this.x = x;
+    this.y = y;
+    this.z = z;
+    this.node0 = [x, y, z];
+    this.node1 = [x + 20, y, z];
+    this.node2 = [x, y + 80, z];
+    this.node3 = [x + 20, y + 80, z];
+    this.node4 = [x + 20, y + 64, z];
+    this.node5 = [x + 40, y + 80, z];
+    this.node6 = [x + 40, y + 64, z];
+    this.node7 = [x + 60, y + 80, z];
+    this.node8 = [x + 40, y + 32, z];
+    this.node9 = [x + 60, y + 32, z];
+    this.node10 = [x + 20, y + 48, z];
+    this.node11 = [x + 40, y + 48, z];
+    this.node12 = [x + 20, y + 32, z];
+    this.nodes = [this.node0, this.node1, this.node2, this.node3, this.node4, this.node5, this.node6, this.node7, this.node8, this.node9, this.node10, this.node11, this.node12];
+    
+    this.face0 = [0, 1, 3, 2];
+    this.face1 = [3, 4, 6, 5];
+    this.face2 = [5, 7, 9, 8];
+    this.face3 = [10, 11, 8, 12];
+    this.faces = [this.face0, this.face1, this.face2, this.face3];
+};
+Number6.prototype.rotateZ3D = function(theta) {
+    var sinTheta = sin(theta);
+    var cosTheta = cos(theta);
+    for (var n = 0; n < this.nodes.length; n++) {
+        var node = this.nodes[n];
+        var x = node[0];
+        var y = node[1];
+        node[0] = x * cosTheta - y * sinTheta;
+        node[1] = y * cosTheta + x * sinTheta;
+    }
+};//rotates around z axis
+Number6.prototype.rotateY3D = function(theta) {
+    var sinTheta = sin(theta);
+    var cosTheta = cos(theta);
+    for (var n = 0; n < this.nodes.length; n++) {
+        var node = this.nodes[n];
+        var x = node[0];
+        var z = node[2];
+        node[0] = x * cosTheta - z * sinTheta;
+        node[2] = z * cosTheta + x * sinTheta;
+    }
+};//rotates around y axis
+Number6.prototype.rotateX3D = function(theta) {
+    var sinTheta = sin(theta);
+    var cosTheta = cos(theta);
+    
+    for (var n=0; n < this.nodes.length; n++) {
+        var node = this.nodes[n];
+        var y = node[1];
+        var z = node[2];
+        node[1] = y * cosTheta - z * sinTheta;
+        node[2] = z * cosTheta + y * sinTheta;
+    }
+};//rotates around x axis
+Number6.prototype.display = function() {
+    for (var i = 0; i < this.nodes.length; i++) {
+        var p1 = persp / (persp -220 - this.nodes[i][2]);
+        if (p1 > 0) {
+            var x = this.nodes[i][0];
+            var y = this.nodes[i][1];
+            this.nodes[i][0] = p1 * x;
+            this.nodes[i][1] = p1 * y - horizon;
+        } else {
+            this.valid = false;
+        }
+    }
+    for (var f = 0; f < this.faces.length; f++) {
+            var n0 = this.faces[f][0];
+            var n1 = this.faces[f][1];
+            var n2 = this.faces[f][2];
+            var n3 = this.faces[f][3];
+            var node0 = this.nodes[n0];
+            var node1 = this.nodes[n1];
+            var node2 = this.nodes[n2];
+            var node3 = this.nodes[n3];
+            
+                fill(0, 0, 0);
+                quad(node0[0], node0[1], node1[0], node1[1], node2[0], node2[1], node3[0], node3[1]);
+    }
+};//number 6 draws
+
+var Number7 = function(x, y, z) {
+    this.x = x;
+    this.y = y;
+    this.z = z;
+    this.node0 = [x, y, z];
+    this.node1 = [x + 20, y, z];
+    this.node2 = [x, y + 32, z];
+    this.node3 = [x + 20, y + 32, z];
+    this.node4 = [x + 40, y, z];
+    this.node5 = [x + 20, y + 16, z];
+    this.node6 = [x + 40, y + 16, z];
+    this.node7 = [x + 60, y, z];
+    this.node8 = [x + 40, y + 80, z];
+    this.node9 = [x + 60, y + 80, z];
+    this.nodes = [this.node0, this.node1, this.node2, this.node3, this.node4, this.node5, this.node6, this.node7, this.node8, this.node9];
+    
+    this.face0 = [0, 1, 3, 2];
+    this.face1 = [1, 4, 6, 5];
+    this.face2 = [4, 7, 9, 8];
+    this.faces = [this.face0, this.face1, this.face2];
+};
+Number7.prototype.rotateZ3D = function(theta) {
+    var sinTheta = sin(theta);
+    var cosTheta = cos(theta);
+    for (var n = 0; n < this.nodes.length; n++) {
+        var node = this.nodes[n];
+        var x = node[0];
+        var y = node[1];
+        node[0] = x * cosTheta - y * sinTheta;
+        node[1] = y * cosTheta + x * sinTheta;
+    }
+};//rotates around z axis
+Number7.prototype.rotateY3D = function(theta) {
+    var sinTheta = sin(theta);
+    var cosTheta = cos(theta);
+    for (var n = 0; n < this.nodes.length; n++) {
+        var node = this.nodes[n];
+        var x = node[0];
+        var z = node[2];
+        node[0] = x * cosTheta - z * sinTheta;
+        node[2] = z * cosTheta + x * sinTheta;
+    }
+};//rotates around y axis
+Number7.prototype.rotateX3D = function(theta) {
+    var sinTheta = sin(theta);
+    var cosTheta = cos(theta);
+    
+    for (var n=0; n < this.nodes.length; n++) {
+        var node = this.nodes[n];
+        var y = node[1];
+        var z = node[2];
+        node[1] = y * cosTheta - z * sinTheta;
+        node[2] = z * cosTheta + y * sinTheta;
+    }
+};//rotates around x axis
+Number7.prototype.display = function() {
+    for (var i = 0; i < this.nodes.length; i++) {
+        var p1 = persp / (persp -220 - this.nodes[i][2]);
+        if (p1 > 0) {
+            var x = this.nodes[i][0];
+            var y = this.nodes[i][1];
+            this.nodes[i][0] = p1 * x;
+            this.nodes[i][1] = p1 * y - horizon;
+        } else {
+            this.valid = false;
+        }
+    }
+    for (var f = 0; f < this.faces.length; f++) {
+            var n0 = this.faces[f][0];
+            var n1 = this.faces[f][1];
+            var n2 = this.faces[f][2];
+            var n3 = this.faces[f][3];
+            var node0 = this.nodes[n0];
+            var node1 = this.nodes[n1];
+            var node2 = this.nodes[n2];
+            var node3 = this.nodes[n3];
+            
+                fill(0, 0, 0);
+                quad(node0[0], node0[1], node1[0], node1[1], node2[0], node2[1], node3[0], node3[1]);
+    }
+};//number 7 draws
+
+var Number8 = function(x, y, z) {
+    this.x = x;
+    this.y = y;
+    this.z = z;
+    this.node0 = [x, y, z];
+    this.node1 = [x + 40, y, z];
+    this.node2 = [x, y + 16, z];
+    this.node3 = [x + 40, y + 16, z];
+    this.node4 = [x + 40, y + 80, z];
+    this.node5 = [x + 60, y, z];
+    this.node6 = [x + 60, y + 80, z];
+    this.node7 = [x + 20, y + 32, z];
+    this.node8 = [x + 40, y + 32, z];
+    this.node9 = [x + 20, y + 48, z];
+    this.node10 = [x + 40, y + 48, z];
+    this.node11 = [x, y + 64, z];
+    this.node12 = [x + 40, y + 64, z];
+    this.node13 = [x, y + 80, z];
+    this.node14 = [x + 20, y + 16, z];
+    this.node15 = [x + 20, y + 64, z];
+    this.nodes = [this.node0, this.node1, this.node2, this.node3, this.node4, this.node5, this.node6, this.node7, this.node8, this.node9, this.node10, this.node11, this.node12, this.node13, this.node14, this.node15];
+    
+    this.face0 = [0, 1, 3, 2];
+    this.face1 = [1, 4, 6, 5];
+    this.face2 = [7, 8, 10, 9];
+    this.face3 = [11, 12, 4, 13];
+    this.face4 = [2, 11, 15, 14];
+    this.faces = [this.face0, this.face1, this.face2, this.face3, this.face4];
+};
+Number8.prototype.rotateZ3D = function(theta) {
+    var sinTheta = sin(theta);
+    var cosTheta = cos(theta);
+    for (var n = 0; n < this.nodes.length; n++) {
+        var node = this.nodes[n];
+        var x = node[0];
+        var y = node[1];
+        node[0] = x * cosTheta - y * sinTheta;
+        node[1] = y * cosTheta + x * sinTheta;
+    }
+};//rotates around z axis
+Number8.prototype.rotateY3D = function(theta) {
+    var sinTheta = sin(theta);
+    var cosTheta = cos(theta);
+    for (var n = 0; n < this.nodes.length; n++) {
+        var node = this.nodes[n];
+        var x = node[0];
+        var z = node[2];
+        node[0] = x * cosTheta - z * sinTheta;
+        node[2] = z * cosTheta + x * sinTheta;
+    }
+};//rotates around y axis
+Number8.prototype.rotateX3D = function(theta) {
+    var sinTheta = sin(theta);
+    var cosTheta = cos(theta);
+    
+    for (var n=0; n < this.nodes.length; n++) {
+        var node = this.nodes[n];
+        var y = node[1];
+        var z = node[2];
+        node[1] = y * cosTheta - z * sinTheta;
+        node[2] = z * cosTheta + y * sinTheta;
+    }
+};//rotates around x axis
+Number8.prototype.display = function() {
+    for (var i = 0; i < this.nodes.length; i++) {
+        var p1 = persp / (persp -220 - this.nodes[i][2]);
+        if (p1 > 0) {
+            var x = this.nodes[i][0];
+            var y = this.nodes[i][1];
+            this.nodes[i][0] = p1 * x;
+            this.nodes[i][1] = p1 * y - horizon;
+        } else {
+            this.valid = false;
+        }
+    }
+    for (var f = 0; f < this.faces.length; f++) {
+            var n0 = this.faces[f][0];
+            var n1 = this.faces[f][1];
+            var n2 = this.faces[f][2];
+            var n3 = this.faces[f][3];
+            var node0 = this.nodes[n0];
+            var node1 = this.nodes[n1];
+            var node2 = this.nodes[n2];
+            var node3 = this.nodes[n3];
+            
+                fill(0, 0, 0);
+                quad(node0[0], node0[1], node1[0], node1[1], node2[0], node2[1], node3[0], node3[1]);
+    }
+};//number 8 draws
+
+var Number9 = function(x, y, z) {
+    this.x = x;
+    this.y = y;
+    this.z = z;
+    this.node0 = [x, y, z];
+    this.node1 = [x + 40, y, z];
+    this.node2 = [x, y + 16, z];
+    this.node3 = [x + 40, y + 16, z];
+    this.node4 = [x + 40, y + 80, z];
+    this.node5 = [x + 60, y, z];
+    this.node6 = [x + 60, y + 80, z];
+    this.node7 = [x + 20, y + 32, z];
+    this.node8 = [x + 40, y + 32, z];
+    this.node9 = [x + 20, y + 48, z];
+    this.node10 = [x + 40, y + 48, z];
+    this.node11 = [x, y + 64, z];
+    this.node12 = [x + 40, y + 64, z];
+    this.node13 = [x, y + 80, z];
+    this.node14 = [x + 20, y + 16, z];
+    this.node15 = [x + 20, y + 48, z];
+    this.node16 = [x, y + 48, z];
+    this.nodes = [this.node0, this.node1, this.node2, this.node3, this.node4, this.node5, this.node6, this.node7, this.node8, this.node9, this.node10, this.node11, this.node12, this.node13, this.node14, this.node15, this.node16];
+    
+    this.face0 = [0, 1, 3, 2];
+    this.face1 = [1, 4, 6, 5];
+    this.face2 = [7, 8, 10, 9];
+    this.face3 = [11, 12, 4, 13];
+    this.face4 = [2, 16, 15, 14];
+    this.faces = [this.face0, this.face1, this.face2, this.face3, this.face4];
+};
+Number9.prototype.rotateZ3D = function(theta) {
+    var sinTheta = sin(theta);
+    var cosTheta = cos(theta);
+    for (var n = 0; n < this.nodes.length; n++) {
+        var node = this.nodes[n];
+        var x = node[0];
+        var y = node[1];
+        node[0] = x * cosTheta - y * sinTheta;
+        node[1] = y * cosTheta + x * sinTheta;
+    }
+};//rotates around z axis
+Number9.prototype.rotateY3D = function(theta) {
+    var sinTheta = sin(theta);
+    var cosTheta = cos(theta);
+    for (var n = 0; n < this.nodes.length; n++) {
+        var node = this.nodes[n];
+        var x = node[0];
+        var z = node[2];
+        node[0] = x * cosTheta - z * sinTheta;
+        node[2] = z * cosTheta + x * sinTheta;
+    }
+};//rotates around y axis
+Number9.prototype.rotateX3D = function(theta) {
+    var sinTheta = sin(theta);
+    var cosTheta = cos(theta);
+    
+    for (var n=0; n < this.nodes.length; n++) {
+        var node = this.nodes[n];
+        var y = node[1];
+        var z = node[2];
+        node[1] = y * cosTheta - z * sinTheta;
+        node[2] = z * cosTheta + y * sinTheta;
+    }
+};//rotates around x axis
+Number9.prototype.display = function() {
+    for (var i = 0; i < this.nodes.length; i++) {
+        var p1 = persp / (persp -220 - this.nodes[i][2]);
+        if (p1 > 0) {
+            var x = this.nodes[i][0];
+            var y = this.nodes[i][1];
+            this.nodes[i][0] = p1 * x;
+            this.nodes[i][1] = p1 * y - horizon;
+        } else {
+            this.valid = false;
+        }
+    }
+    for (var f = 0; f < this.faces.length; f++) {
+            var n0 = this.faces[f][0];
+            var n1 = this.faces[f][1];
+            var n2 = this.faces[f][2];
+            var n3 = this.faces[f][3];
+            var node0 = this.nodes[n0];
+            var node1 = this.nodes[n1];
+            var node2 = this.nodes[n2];
+            var node3 = this.nodes[n3];
+            
+                fill(0, 0, 0);
+                quad(node0[0], node0[1], node1[0], node1[1], node2[0], node2[1], node3[0], node3[1]);
+    }
+};//number 9 draws
+
+var Score = function(scoreInput) {
+    this.scoreString = scoreInput.toString();
+    this.digits = this.scoreString.length;
+    if (this.digits === 1) {
+        if (this.scoreString[0] === "0") {
+            this.number = new Number0(-30, -40, -400);
+        } else if (this.scoreString[0] === "1") {
+            this.number = new Number1(-30, -40, -400);
+        } else if (this.scoreString[0] === "2") {
+            this.number = new Number2(-30, -40, -400);
+        } else if (this.scoreString[0] === "3") {
+            this.number = new Number3(-30, -40, -400);
+        } else if (this.scoreString[0] === "4") {
+            this.number = new Number4(-30, -40, -400);
+        } else if (this.scoreString[0] === "5") {
+            this.number = new Number5(-30, -40, -400);
+        } else if (this.scoreString[0] === "6") {
+            this.number = new Number6(-30, -40, -400);
+        } else if (this.scoreString[0] === "7") {
+            this.number = new Number7(-30, -40, -400);
+        } else if (this.scoreString[0] === "8") {
+            this.number = new Number8(-30, -40, -400);
+        } else if (this.scoreString[0] === "9") {
+            this.number = new Number9(-30, -40, -400);
+        }
+    } else if (this.digits === 2) {
+        if (this.scoreString[0] === "0") {
+            this.number = new Number0(-70, -40, -400);
+        } else if (this.scoreString[0] === "1") {
+            this.number = new Number1(-70, -40, -400);
+        } else if (this.scoreString[0] === "2") {
+            this.number = new Number2(-70, -40, -400);
+        } else if (this.scoreString[0] === "3") {
+            this.number = new Number3(-70, -40, -400);
+        } else if (this.scoreString[0] === "4") {
+            this.number = new Number4(-70, -40, -400);
+        } else if (this.scoreString[0] === "5") {
+            this.number = new Number5(-70, -40, -400);
+        } else if (this.scoreString[0] === "6") {
+            this.number = new Number6(-70, -40, -400);
+        } else if (this.scoreString[0] === "7") {
+            this.number = new Number7(-70, -40, -400);
+        } else if (this.scoreString[0] === "8") {
+            this.number = new Number8(-70, -40, -400);
+        } else if (this.scoreString[0] === "9") {
+            this.number = new Number9(-70, -40, -400);
+        }
+        
+        if (this.scoreString[1] === "0") {
+            this.number2 = new Number0(10, -40, -400);
+        } else if (this.scoreString[1] === "1") {
+            this.number2 = new Number1(10, -40, -400);
+        } else if (this.scoreString[1] === "2") {
+            this.number2 = new Number2(10, -40, -400);
+        } else if (this.scoreString[1] === "3") {
+            this.number2 = new Number3(10, -40, -400);
+        } else if (this.scoreString[1] === "1") {
+            this.number2 = new Number4(10, -40, -400);
+        } else if (this.scoreString[1] === "5") {
+            this.number2 = new Number5(10, -40, -400);
+        } else if (this.scoreString[1] === "6") {
+            this.number2 = new Number6(10, -40, -400);
+        } else if (this.scoreString[1] === "7") {
+            this.number2 = new Number7(10, -40, -400);
+        } else if (this.scoreString[1] === "8") {
+            this.number2 = new Number8(10, -40, -400);
+        } else if (this.scoreString[1] === "9") {
+            this.number2 = new Number9(10, -40, -400);
+        }
+    }
+};
+Score.prototype.update = function(scoreInput) {
+    this.scoreString = scoreInput.toString();
+    this.digits = this.scoreString.length;
+    if (this.digits === 1) {
+        if (this.scoreString[0] === "0") {
+            this.number = new Number0(-30, -40, -400);
+        } else if (this.scoreString[0] === "1") {
+            this.number = new Number1(-30, -40, -400);
+        } else if (this.scoreString[0] === "2") {
+            this.number = new Number2(-30, -40, -400);
+        } else if (this.scoreString[0] === "3") {
+            this.number = new Number3(-30, -40, -400);
+        } else if (this.scoreString[0] === "4") {
+            this.number = new Number4(-30, -40, -400);
+        } else if (this.scoreString[0] === "5") {
+            this.number = new Number5(-30, -40, -400);
+        } else if (this.scoreString[0] === "6") {
+            this.number = new Number6(-30, -40, -400);
+        } else if (this.scoreString[0] === "7") {
+            this.number = new Number7(-30, -40, -400);
+        } else if (this.scoreString[0] === "8") {
+            this.number = new Number8(-30, -40, -400);
+        } else if (this.scoreString[0] === "9") {
+            this.number = new Number9(-30, -40, -400);
+        }
+    } else if (this.digits === 2) {
+        if (this.scoreString[0] === "0") {
+            this.number = new Number0(-70, -40, -400);
+        } else if (this.scoreString[0] === "1") {
+            this.number = new Number1(-70, -40, -400);
+        } else if (this.scoreString[0] === "2") {
+            this.number = new Number2(-70, -40, -400);
+        } else if (this.scoreString[0] === "3") {
+            this.number = new Number3(-70, -40, -400);
+        } else if (this.scoreString[0] === "4") {
+            this.number = new Number4(-70, -40, -400);
+        } else if (this.scoreString[0] === "5") {
+            this.number = new Number5(-70, -40, -400);
+        } else if (this.scoreString[0] === "6") {
+            this.number = new Number6(-70, -40, -400);
+        } else if (this.scoreString[0] === "7") {
+            this.number = new Number7(-70, -40, -400);
+        } else if (this.scoreString[0] === "8") {
+            this.number = new Number8(-70, -40, -400);
+        } else if (this.scoreString[0] === "9") {
+            this.number = new Number9(-70, -40, -400);
+        }
+        
+        if (this.scoreString[1] === "0") {
+            this.number2 = new Number0(10, -40, -400);
+        } else if (this.scoreString[1] === "1") {
+            this.number2 = new Number1(10, -40, -400);
+        } else if (this.scoreString[1] === "2") {
+            this.number2 = new Number2(10, -40, -400);
+        } else if (this.scoreString[1] === "3") {
+            this.number2 = new Number3(10, -40, -400);
+        } else if (this.scoreString[1] === "4") {
+            this.number2 = new Number4(10, -40, -400);
+        } else if (this.scoreString[1] === "5") {
+            this.number2 = new Number5(10, -40, -400);
+        } else if (this.scoreString[1] === "6") {
+            this.number2 = new Number6(10, -40, -400);
+        } else if (this.scoreString[1] === "7") {
+            this.number2 = new Number7(10, -40, -400);
+        } else if (this.scoreString[1] === "8") {
+            this.number2 = new Number8(10, -40, -400);
+        } else if (this.scoreString[1] === "9") {
+            this.number2 = new Number9(10, -40, -400);
+        }
+    }
+    this.number.rotateY3D(-yRotate);
+    this.number.rotateX3D(-xRotate);
+    if (this.digits === 2) {
+        this.number2.rotateY3D(-yRotate);
+        this.number2.rotateX3D(-xRotate);
+    }
+};
+Score.prototype.display = function() {
+    this.number.display();
+    if (this.digits === 2) {
+        this.number2.display();
+    }
+};
+
+var ball = new Ball(-190, 20, 20, 20, true);
+var room = new Room();
+var paddle = new Paddle(140, -250);
+var pong = new Pong(-150, -108, -200);
+var play = new Button({
+    x: 0,
+    y: -50,
+    z: -200,
+    width: 70,
+    height: 50,
+    text: "play",
+    coloring: color(0, 0, 0)
+});
+var instructions = new Button({
+    x: 0,
+    y: -50,
+    z: -200,
+    width: 70,
+    height: 50,
+    text: "Instructions",
+    coloring: color(0, 0, 0)
+});
+var settings = new Button({
+    x: 0,
+    y: 0,
+    z: -200,
+    width: 100,
+    height: 50,
+    text: "settings",
+    coloring: color(0, 0, 0)
+});
+var mainMenu = new Button({
+    x: -width / 4,
+    y: 130,
+    z: -200,
+    width: 150,
+    height: 50,
+    text: "Main Menu",
+    coloring: color(255, 255, 255)
+});
+var playAgain = new Button({
+    x: width / 4,
+    y: 130,
+    z: -200,
+    width: 150,
+    height: 50,
+    text: "Play Again",
+    coloring: color(255, 255, 255)
+});
+/*var playAnyway = new Button({
+    x: 0,
+    y: 137,
+    z: -200,
+    width: 161,
+    height: 50,
+    text: "Play Anyway",
+    coloring: color(0, 0, 0)
+});*/
+var back = new Button({
+    x: 0,
+    y: 180,
+    z: -200,
+    width: 80,
+    height: 40,
+    text: "Back",
+    coloring: color(0, 0, 0)
+});
+var chooseBallSpeed = new Option({
+    width: 100,
+    height: 30,
+    choices: [["×1", -120, -145, true, 1], ["×2", 0, -145, false, 3], ["×3",120, -145, false, 3]],
+    type: 0
+});
+var choosePaddleSpeed = new Option({
+    width: 100,
+    height: 30,
+    choices: [["×1",-120, -70, true, 4], ["×1.5",0, -70, false, 6], ["×2",120, -70, false, 8]],
+    type: 3
+});
+var chooseBallColor = new Option({
+    width: 30,
+    height: 30,
+    choices: [[color(255, 0, 0),-175, 75, true], [color(255, 150, 0), -105, 75, false], [color(255, 255, 0), -35, 75, false], [color(0, 255, 0), 35, 75, false], [color(0, 0, 255), 105, 75, false], [color(255, 0, 255), 175, 75, false]],
+    type: 1
+});
+var choosePaddleColor = new Option({
+    width: 30,
+    height: 30,
+    choices: [[color(255, 0, 0),-175, 0, false], [color(255, 150, 0), -105, 0, false], [color(255, 255, 0), -35, 0, false], [color(0, 255, 0), 35, 0, false], [color(0, 0, 255), 105, 0, true], [color(255, 0, 255), 175, 0, false]],
+    type: 2
+});
+var chooseRoomColor = new Option({
+    width: 30,
+    height: 30,
+    choices: [[color(255, 0, 0),-175, 150, false], [color(255, 150, 0), -105, 150, false], [color(255, 255, 0), -35, 150, false], [color(0, 255, 0), 35, 150, true], [color(0, 0, 255), 105, 150, false], [color(255, 0, 255), 175, 150, false]],
+    type: 4
+});
+var score = new Score(7);
+var fruit = new Fruits(0, false);
+draw = function() {
+    /*if (level === -1) {//checks screen size
+        cursor(ARROW);
+        background(backgroundColor);
+        room.update();
+        room.display();
+        paddle.update();
+        paddle.display();
+        fill(247, 250, 225);
+        rect((-width / 2) + 30, (-height / 2) + 30, width - 60, height - 60, 20);
+        fill(0, 0, 0);
+        textSize(25);
+        text("For a better game\nexperience, paste this\n to the end of the URL bar:\n\n ?width=600", 0, -50);
+        playAnyway.display();
+        mouseClicked = function() {
+            if (playAnyway.isMouseOver()) {
+                level = 0;
+            }
+        };
+    } else*/ if (level === 0) {
+        cursor(MOVE);
+        play = new Button({//makes new play button (probably isn't the best idea to define it in a loop)
+            x: 0,
+            y: -15,
+            z: -200,
+            width: 70,
+            height: 40,
+            text: "play",
+            coloring: color(0, 0, 0)
+        });
+        var instructions = new Button({
+            x: 0,
+            y: 30,
+            z: -200,
+            width: 150,
+            height: 50,
+            text: "Instructions",
+            coloring: color(0, 0, 0)
+        });
+        settings = new Button({
+            x: 0,
+            y: 75,
+            z: -200,
+            width: 100,
+            height: 40,
+            text: "settings",
+            coloring: color(0, 0, 0)
+        });
+        background(backgroundColor);
+        if (mouseIsPressed) {//rotates when mouse pressed
+            yRotate += mouseX - pmouseX;
+            xRotate += mouseY - pmouseY;
+        }
+        if (keyW) {
+            xRotate -= 1;
+        }
+        if (keyS) {
+            xRotate += 1;
+        }
+        if (keyA) {
+            yRotate -= 1;
+        }
+        if (keyD) {
+            yRotate += 1;
+        }
+        if (yRotate < -20) {
+            yRotate = -20;
+        } else if (yRotate > 20) {
+            yRotate = 20;
+        }
+        if (xRotate < -20) {
+            xRotate = -20;
+        } else if (xRotate > 20) {
+            xRotate = 20;
+        }
+        room.update();
+        room.display();
+        paddle.update();
+        play.update();
+        settings.update();
+        instructions.update();
+        pong.update();
+        if (ball.cube.node0[2] < paddle.cube.node0[2]) {//checks order of objects
+            play.display();
+            settings.display();
+            instructions.display();
+            paddle.display();
+        } else if (ball.cube.node0[2] > paddle.cube.node0[2]) {
+            paddle.display();
+            play.display();
+            instructions.display();
+            settings.display();
+        }
+        mouseClicked = function() {
+            if (level === 0) {
+                if (play.isMouseOver()) {
+                    ball = new Ball(-190, 20, 20, 20, true);
+                    room = new Room();
+                    paddle = new Paddle(140, -250);
+                    level = 2;
+                } else if (settings.isMouseOver()) {
+                    xRotate = 1;
+                    yRotate = 0;
+                    level = 1;
+                } else if (instructions.isMouseOver()) {
+                    xRotate = 1;
+                    yRotate = 0;
+                    level = -2;
+                }
+            }
+        };
+    } else if (level === -2) {
+        cursor(ARROW);
+        back = new Button({
+            x: 0,
+            y: 156,
+            z: -200,
+            width: 80,
+            height: 40,
+            text: "Back",
+            coloring: color(0, 0, 0)
+        });
+        background(backgroundColor);
+        back.update();
+        back.display();
+        fill(0, 0, 0);
+        textSize(20);
+        textAlign(CENTER, TOP);
+        text("This game is just a 3 - dimensional\n version of the classic arcade game pong.\nYou must use your arrow keys to move the\npaddle and keep the ball from hitting the\nfloor. In this version, you can drag your\nmouse across the screen to change the\nangle from which you are viewing the\nroom. There are two powerups available\nat the moment, cherries and power pellets.\nCherries give you two extra points.  Power\npellets make the ball follow your paddle\nand flip the rules so now if the ball hits\nthe paddle, you will die.  Good Luck!", 0, - height / 2 + 20);
+        
+        mouseClicked = function() {
+            if (back.isMouseOver()) {
+                level = 0;
+            }
+        };
+        
+    }else if (level === 1) {
+        cursor(ARROW);
+        back = new Button({
+            x: 0,
+            y: 187,
+            z: -200,
+            width: 80,
+            height: 40,
+            text: "Back",
+            coloring: color(0, 0, 0)
+        });
+        background(backgroundColor);
+        mouseClicked = function() {
+            chooseBallSpeed.itemSelected();
+            choosePaddleSpeed.itemSelected();
+            chooseBallColor.itemSelected();
+            chooseRoomColor.itemSelected();
+            choosePaddleColor.itemSelected();
+            if (back.isMouseOver()) {
+                level = 0;
+            }
+        };
+        fill(0, 0, 0);
+        text("Ball Speed:", 0, -183);
+        text("Paddle Speed:", 0, -108);
+        text("Paddle Color:", 0, -35);
+        text("Ball Color:", 0, 35);
+        text("Room Color:", 0, 108);
+        back.update();
+        back.display();
+        chooseBallSpeed.display();
+        choosePaddleSpeed.display();
+        chooseBallColor.display();
+        choosePaddleColor.display();
+        chooseRoomColor.display();
+    }else if (level === 2) {
+        cursor(MOVE);
+        background(backgroundColor);
+        if (mouseIsPressed) {//rotates screen
+            yRotate += mouseX - pmouseX;
+            xRotate += mouseY - pmouseY;
+        }
+        if (keyW) {
+            xRotate -= 1;
+        } else if (keyS) {
+            xRotate += 1;
+        } else if (keyA) {
+            yRotate -= 1;
+        } else if (keyD) {
+            yRotate += 1;
+        }
+        if (yRotate < -20) {
+            yRotate = -20;
+        } else if (yRotate > 20) {
+            yRotate = 20;
+        }
+        if (xRotate < -20) {
+            xRotate = -20;
+        } else if (xRotate > 20) {
+            xRotate = 20;
+        }
+        room.update();
+        room.display();
+        score.update(numberScore);
+        score.display();
+        fruit.checkEdges(paddle);
+        fruit.update();
+        paddle.arrows();
+        paddle.update();
+        ball.checkEdges(paddle);
+        if (ball.position.x > paddle.position.x - ball.w && ball.position.x < paddle.position.x + paddle.w && ball.position.z < paddle.position.z + ball.d + paddle.w && ball.position.z > paddle.position.z - ball.d) {
+            ball.update(140, paddle);
+        } else {
+            ball.update(150, paddle);
+        }
+        if (ball.cube.node0[2] < paddle.cube.node0[2]) {//checks order
+            ball.shadow.display();
+            ball.display();
+            paddle.display();
+            fruit.display();
+        } else if (ball.cube.node0[2] > paddle.cube.node0[2]) {
+            paddle.display();
+            fruit.display();
+            ball.shadow.display();
+            ball.display();
+        }
+    } else if (level === 3) {
+        cursor(ARROW);
+        background(backgroundColor);
+        room.update();
+        room.display();
+        paddle.update();
+        paddle.display();
+        score.update(numberScore);
+        score.display();
+        fill(0, 0, 0, fade);
+        rect(-(width / 2 + 1), -(height / 2 + 1), width + 1, height + 1);//fades screen
+        if (fade < 255) {
+            fade += 3;
+        } else {
+            ball = new Ball(-10, 20, 20, 20, false);
+            paddle = new Paddle(100, -50);
+            xRotate = 20;
+            yRotate = 20;
+            running = false;
+            level = 4;
+        }
+    } else if (level === 4) {//losing screen
+        cursor(ARROW);
+        background(0, 0, 0);
+        yRotate += 0.5;
+        for (var i = 0; i < 60; i++) {
+            noStroke();
+            fill(i * 4);
+            ellipse(0, 0, 300 - i * 5, 300 - i * 5);
+        }
+        ball.update();
+        paddle.update();
+        if (ball.cube.node0[2] < paddle.cube.node0[2]) {
+            ball.display();
+            paddle.display();
+        } else if (ball.cube.node0[2] > paddle.cube.node0[2]) {
+            paddle.display();
+            ball.display();
+        }
+        mainMenu.display();//buttons
+        playAgain.display();
+        fill(255, 255, 255);
+        textSize(80);
+        text("YOU LOST", 0, -140);
+        textSize(25);
+        if (width === 600 && height === 400) {
+            text("score: " + numberScore, 0, 130);
+        } else {
+            text("score: " + numberScore, 0, 160);
+        }
+        if (fade > 0) {
+            fill(0, 0, 0, fade);
+            rect(-(width / 2 + 1), -(height / 2 + 1), width + 1, height + 1);
+            fade -= 3;
+        }
+        if (mouseIsPressed) {//checks if mouse clicked
+            if (level === 4) {
+                if (mainMenu.isMouseOver()) {
+                    xRotate = 1;
+                    yRotate = 0;
+                    room = new Room();
+                    paddle = new Paddle(140, -250);
+                    fruit = new Fruits(0, false);
+                    numberScore = 0;
+                    level = 0;
+                    for (var i = 0; i < chooseBallSpeed.choices.length; i++) {
+                        var difficultyLevel = chooseBallSpeed.choices[i];
+                        if (difficultyLevel[3] === true) {
+                            speed = difficultyLevel[4];
+                        }
+                    }
+                    for (var i = 0; i < choosePaddleSpeed.choices.length; i++) {
+                        var difficultyLevel = choosePaddleSpeed.choices[i];
+                        if (difficultyLevel[3] === true) {
+                            paddleSpeed = difficultyLevel[4];
+                        }
+                    }
+                } else if (playAgain.isMouseOver()) {
+                    xRotate = 1;
+                    yRotate = 0;
+                    ball = new Ball(-190, 20, 20, 20, true);
+                    room = new Room();
+                    paddle = new Paddle(140, -250);
+                    fruit = new Fruits(0, false);
+                    numberScore = 0;
+                    level = 2;
+                    for (var i = 0; i < chooseBallSpeed.choices.length; i++) {
+                        var difficultyLevel = chooseBallSpeed.choices[i];
+                        if (difficultyLevel[3] === true) {
+                            speed = difficultyLevel[4];
+                        }
+                    }
+                    for (var i = 0; i < choosePaddleSpeed.choices.length; i++) {
+                        var difficultyLevel = choosePaddleSpeed.choices[i];
+                        if (difficultyLevel[3] === true) {
+                            paddleSpeed = difficultyLevel[4];
+                        }
+                    }
+                }
+            }
+        }
+    }
+};
+
+keyPressed = function() {
+    if (keyCode === UP) {
+        keyUp = true;
+    } else if (keyCode === DOWN) {
+        keyDown = true;
+    } else if (keyCode === RIGHT) {
+        keyRight = true;
+    } else if (keyCode === LEFT) {
+        keyLeft = true;
+    } else if (key.toString() === "w") {
+        keyW = true;
+    } else if (key.toString() === "s") {
+        keyS = true;
+    } else if (key.toString() === "a") {
+        keyA = true;
+    } else if (key.toString() === "d") {
+        keyD = true;
+    }
+};
+
+keyReleased = function() {
+    if (keyCode === UP) {
+        keyUp = false;
+    } else if (keyCode === DOWN) {
+        keyDown = false;
+    } else if (keyCode === RIGHT) {
+        keyRight = false;
+    } else if (keyCode === LEFT) {
+        keyLeft = false;
+    } else if (key.toString() === "w") {
+        keyW = false;
+    } else if (key.toString() === "s") {
+        keyS = false;
+    } else if (key.toString() === "a") {
+        keyA = false;
+    } else if (key.toString() === "d") {
+        keyD = false;
+    }
+};
+
+translate(width / 2, height / 2);//moves screen to center
+
+    </script>
 </body>
 </html>
